@@ -13,6 +13,10 @@ from app.schemas.appointment import (
     AppointmentUpdate,
     AppointmentResponse,
 )
+from app.services.email_service import (
+    send_appointment_confirmation,
+    send_cancellation_email,
+)
 from typing import List
 
 router = APIRouter()
@@ -24,7 +28,6 @@ async def book_appointment(
     db: AsyncSession = Depends(get_db),
     current_patient: Patient = Depends(get_current_patient),
 ):
-    # Check slot exists and is available
     slot_result = await db.execute(
         select(Slot).where(Slot.id == data.slot_id, Slot.is_available == True)
     )
@@ -32,7 +35,6 @@ async def book_appointment(
     if not slot:
         raise HTTPException(status_code=404, detail="Slot not found or already booked")
 
-    # Check doctor exists
     doctor_result = await db.execute(
         select(Doctor).where(Doctor.id == data.doctor_id, Doctor.is_active == True)
     )
@@ -40,7 +42,6 @@ async def book_appointment(
     if not doctor:
         raise HTTPException(status_code=404, detail="Doctor not found")
 
-    # Check patient has no existing appointment at same time
     conflict = await db.execute(
         select(Appointment)
         .join(Slot)
@@ -58,7 +59,6 @@ async def book_appointment(
             status_code=409, detail="You already have an appointment at this time"
         )
 
-    # Book the appointment
     appointment = Appointment(
         patient_id=current_patient.id,
         doctor_id=data.doctor_id,
@@ -69,6 +69,16 @@ async def book_appointment(
     db.add(appointment)
     await db.commit()
     await db.refresh(appointment)
+
+    await send_appointment_confirmation(
+        patient_email=current_patient.email,
+        patient_name=current_patient.full_name,
+        doctor_name=doctor.full_name,
+        specialization=doctor.specialization,
+        start_time=slot.start_time.strftime("%B %d, %Y at %I:%M %p"),
+        end_time=slot.end_time.strftime("%I:%M %p"),
+    )
+
     return appointment
 
 
@@ -103,7 +113,6 @@ async def cancel_appointment(
 
     appointment.status = AppointmentStatus.cancelled
 
-    # Free the slot back
     slot_result = await db.execute(select(Slot).where(Slot.id == appointment.slot_id))
     slot = slot_result.scalar_one_or_none()
     if slot:
@@ -111,6 +120,18 @@ async def cancel_appointment(
 
     await db.commit()
     await db.refresh(appointment)
+
+    await send_cancellation_email(
+        patient_email=current_patient.email,
+        patient_name=current_patient.full_name,
+        doctor_name="Your Doctor",
+        start_time=(
+            slot.start_time.strftime("%B %d, %Y at %I:%M %p")
+            if slot
+            else "your scheduled time"
+        ),
+    )
+
     return appointment
 
 
