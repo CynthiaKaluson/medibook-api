@@ -59,4 +59,5 @@ urllib3==2.6.3
 uvicorn==0.41.0
 vine==5.1.0
 wcwidth==0.6.0
-wheel==0.46.3slowapi==0.1.9
+wheel==0.46.3
+slowapi==0.1.9
