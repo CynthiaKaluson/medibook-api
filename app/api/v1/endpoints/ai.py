@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.db.session import get_db
 from app.core.dependencies import get_current_patient
 from app.models.patient import Patient
@@ -11,6 +13,8 @@ from app.services.ai_service import suggest_best_slot, patient_chatbot
 from pydantic import BaseModel
 from typing import List, Optional
 import uuid
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -36,7 +40,6 @@ async def get_slot_suggestion(
     db: AsyncSession = Depends(get_db),
     current_patient: Patient = Depends(get_current_patient),
 ):
-    # Get available slots for this doctor
     result = await db.execute(
         select(Slot).where(Slot.doctor_id == data.doctor_id, Slot.is_available == True)
     )
@@ -47,7 +50,6 @@ async def get_slot_suggestion(
             status_code=404, detail="No available slots for this doctor"
         )
 
-    # Get doctor specialization
     doctor_result = await db.execute(select(Doctor).where(Doctor.id == data.doctor_id))
     doctor = doctor_result.scalar_one_or_none()
     if not doctor:
@@ -77,12 +79,13 @@ async def get_slot_suggestion(
 
 
 @router.post("/chat")
+@limiter.limit("10/minute")
 async def chat_with_medibot(
+    request: Request,
     data: ChatRequest,
     db: AsyncSession = Depends(get_db),
     current_patient: Patient = Depends(get_current_patient),
 ):
-    # Get patient's appointments
     result = await db.execute(
         select(Appointment).where(Appointment.patient_id == current_patient.id)
     )
