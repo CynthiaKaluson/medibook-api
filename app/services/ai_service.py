@@ -17,10 +17,13 @@ def _call_openai_with_retry(kwargs: dict):
 
     for attempt in range(MAX_RETRIES + 1):
         try:
+            start_time = time.time()
             response = client.chat.completions.create(
                 timeout=15,
                 **kwargs,
             )
+            elapsed = round(time.time() - start_time, 2)
+            logger.info(f"OpenAI call succeeded in {elapsed}s on attempt {attempt + 1}")
             return response
         except APITimeoutError as e:
             last_error = e
