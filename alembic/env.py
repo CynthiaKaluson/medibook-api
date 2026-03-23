@@ -7,10 +7,8 @@ from app.db.base import Base
 from app.models import Clinic, Doctor, Patient, Slot, Appointment
 
 config = context.config
-config.set_main_option(
-    "sqlalchemy.url",
-    settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://"),
-)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
