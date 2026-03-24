@@ -13,7 +13,6 @@ __pycache__/
 *.sqlite3
 
 # Alembic
-alembic/versions/
 
 # Logs
 *.log
