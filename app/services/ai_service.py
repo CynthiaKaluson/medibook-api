@@ -4,6 +4,11 @@ import logging
 from openai import OpenAI, APITimeoutError, RateLimitError, APIError
 from app.core.config import settings
 
+import os
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
+
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 logger = logging.getLogger(__name__)
 
